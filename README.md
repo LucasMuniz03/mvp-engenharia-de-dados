@@ -42,7 +42,7 @@ A modelagem seguiu o conceito de *Flat Table* no formato Delta. Pra não deixar 
 
 Aceitei a sugestão de descrição gerada por IA da própria plataforma e adicionei comentários manuais nas colunas de regra de negócio (como `Media_Valor`, `Saldo` e `Estrangeiros`), garantindo que qualquer outra pessoa do time consiga entender a base.
 
-*(Insira a imagem do Catálogo de Dados arrastando ela para cá)*
+*<img width="881" height="832" alt="Captura de tela 2026-09-04 215047" src="https://github.com/user-attachments/assets/83858631-4942-4bb8-b09e-6c3291cd9c56" />*
 
 ---
 
