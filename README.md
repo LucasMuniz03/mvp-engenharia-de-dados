@@ -109,3 +109,11 @@ Com a base limpa, as perguntas foram respondidas na Camada Gold:
 Foi um baita desafio sair da teoria e ver o pipeline rodando do começo ao fim. Bater cabeça com a limpeza de strings e tipos no PySpark e depois lidar com os mecanismos de segurança do formato Delta (quando o metadata da tabela não bateu após eu renomear uma coluna) geraram um aprendizado técnico profundo. 
 
 Ver os gráficos respondendo às perguntas lá no final compensou o esforço, especialmente ao conseguir gerar insights com viés de Business Intelligence (como calcular o ROI dos elencos na Análise 4). Ficou claríssimo na prática o valor imenso que uma boa engenharia e governança de dados tem antes de qualquer trabalho analítico. Como trabalhos futuros, pretendo plugar uma ferramenta de visualização externa, como o Power BI, consumindo essa tabela da Camada Gold para criar dashboards interativos.
+
+---
+
+## 👨‍💻 Autor
+
+Desenvolvido por **Lucas Muniz**
+* [LinkedIn](https://www.linkedin.com/in/lucasmunizd)
+* [E-mail](mailto:muniz.lucasmuniz03@gmail.com)
