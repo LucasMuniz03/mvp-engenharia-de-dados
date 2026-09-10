@@ -8,9 +8,15 @@ A ideia aqui foi sair da teoria e botar a mão na massa construindo um pipeline 
 
 ## 🎯 Contexto de Negócios e Perguntas (Etapas 2 e 4.1)
 
-Sempre ouvimos que "dinheiro não entra em campo", mas até que ponto isso é verdade num campeonato de pontos corridos? O objetivo deste projeto foi cruzar estatísticas puras do jogo (vitórias, gols, saldo) com informações de gestão de elenco (valor de mercado, média de idade, quantidade de estrangeiros) para tentar descobrir o que realmente faz um time pontuar.
+Sempre ouvimos que "dinheiro não entra em campo", mas até que ponto isso é verdade num campeonato de pontos corridos? O objetivo deste projeto foi cruzar estatísticas puras do jogo (vitórias, gols, saldo) com informações financeiras e de gestão de elenco (valor de mercado, média de idade, quantidade de estrangeiros) para tentar descobrir o que realmente faz um time pontuar.
 
-Para isso, peguei uma base pública do Kaggle com dados do Campeonato Brasileiro de 2009 a 2018 (extraídos do Transfermarkt). A licença dos dados é CC0: Domínio Público (Open Data).
+Para guiar o pipeline, defini 4 perguntas principais:
+1. O dinheiro compra resultado em campo?
+2. Experiência vs. Juventude: quem entrega mais saldo de gols?
+3. O Fator Gringo: vale a pena trazer estrangeiros?
+4. **Eficiência Financeira:** Qual é o custo médio de cada ponto conquistado na tabela? Quem gasta melhor?
+
+Para isso, peguei uma base pública do Kaggle com dados do Campeonato Brasileiro de 2009 a 2018 (extraídos do Transfermarkt). A licença dos dados atende aos requisitos de dados abertos (CC0: Domínio Público).
 
 ---
 
@@ -22,52 +28,84 @@ A carga inicial (Ingestão) foi feita através do upload do arquivo bruto `Tabel
 
 ---
 
-## 🏗️ Pipeline de Dados e Qualidade (Etapas 4.4 e 4.5)
+## 🏗️ Pipeline de Dados (Etapa 4.4)
 
-Utilizei a **Arquitetura Medalhão** para organizar o fluxo do dado e concentrei o processo em um Notebook organizado e documentado:
+Utilizei a **Arquitetura Medalhão** para organizar o fluxo do dado e concentrei o processo em um Notebook documentado:
 
-*   **🥉 Camada Bronze (Extract):** Leitura do dado bruto que foi carregado na etapa anterior. A ideia é manter o dado original intacto para rastreabilidade.
-*   **🥈 Camada Silver (Transform & Load):** Usei **PySpark** para a faxina geral e tratamento de qualidade. A base original tinha alguns problemas: 
-    1. O ano estava defasado (adicionei +1 ao ano).
-    2. A coluna de gols misturava saldo feito e sofrido na mesma string, tipo `30:47` (fiz o split criando duas colunas distintas para essas informações). 
-    3. Os valores financeiros vieram como texto (fiz o cast para Double e Integer). 
-    *Arrumei tudo isso via código, mudei os tipos, corrigi os nomes das colunas e salvei a tabela em formato Delta para garantir a performance, transações ACID e a segurança de schema.*
-*   **🥇 Camada Gold (Análises):** Fui pro SQL puro dentro do Databricks para modelar os dados, agrupar os times e extrair as respostas de negócio, gerando gráficos direto na plataforma.
+*   **🥉 Camada Bronze (Extract):** Leitura do dado bruto. A ideia é manter o dado original intacto para rastreabilidade, servindo como nosso cofre de evidências.
+*   **🥈 Camada Silver (Transform & Load):** Onde a mágica do ETL aconteceu. Usei **PySpark** para fazer a limpeza, tipagem e regras de qualidade (detalhadas no tópico abaixo). O DataFrame resultante foi salvo em formato **Delta Lake**, garantindo performance de leitura e segurança (transações ACID).
+*   **🥇 Camada Gold (Análises):** Fui para o SQL puro dentro do Databricks para modelar os dados, cruzar informações financeiras com as esportivas e extrair as respostas de negócio.
+
+---
+
+## 🧹 Análise de Qualidade de Dados (Etapa 4.5)
+
+Antes de gerar qualquer insight, a Camada Silver foi responsável por garantir a confiabilidade da base. Analisando os atributos brutos, apliquei os seguintes tratamentos:
+
+*   **Consistência e Atomicidade:** A coluna original de gols misturava gols a favor e contra na mesma string (ex: `30:47`). Usei um *split* no PySpark para criar duas colunas atômicas e inteiras (`GolsFeitos` e `GolsSofridos`).
+*   **Acurácia:** Os anos das temporadas estavam defasados em relação à realidade do campeonato. Apliquei uma regra somando `+1` à coluna de Ano. Além disso, valores financeiros que vieram em formato de texto foram devidamente convertidos (cast) para `Double`.
+*   **Completude e Unicidade:** A base não apresentou valores nulos críticos nem duplicatas que ferissem a granularidade de "Um clube por ano".
+*   **Outliers:** Identifiquei clubes com valores de elenco discrepantes (muito acima da média). Eles foram propositalmente mantidos na base, pois refletem a realidade da desigualdade financeira do futebol brasileiro e são a peça chave para responder à Pergunta 1.
 
 ---
 
 ## 🗂️ Modelagem e Catálogo de Dados (Etapa 4.3)
 
-A modelagem seguiu o conceito de *Flat Table* no formato Delta. Pra não deixar o dado "jogado", usei o **Catalog Explorer** do Databricks para documentar a tabela Silver. 
+A modelagem adotou o padrão de *Flat Table* (Tabela Única Desnormalizada), excelente para análises diretas em Data Lakehouses. Para não deixar o dado "jogado", usei o **Unity Catalog** do Databricks para documentar a tabela Silver. 
 
-Aceitei a sugestão de descrição gerada por IA da própria plataforma e adicionei comentários manuais nas colunas de regra de negócio (como `Media_Valor`, `Saldo` e `Estrangeiros`), garantindo que qualquer outra pessoa do time consiga entender a base.
+Aceitei a descrição gerada por IA e adicionei comentários nas colunas de regra de negócio, garantindo a governança da base.
 
-*<img width="881" height="832" alt="Captura de tela 2026-09-04 215047" src="https://github.com/user-attachments/assets/83858631-4942-4bb8-b09e-6c3291cd9c56" />*
+![Catálogo](Catálogo.png)
+
+**Dicionário de Dados Transcrito:**
+
+| Coluna | Tipo (Delta) | Descrição do Campo |
+| :--- | :--- | :--- |
+| **Ano** | `bigint` | Ano (temporada) de referência do campeonato. |
+| **Posicao** | `bigint` | Posição final ocupada pelo clube na tabela. |
+| **Clubes** | `string` | Nome oficial do clube. |
+| **Vitorias** | `bigint` | Quantidade de partidas vencidas. |
+| **Derrotas** | `bigint` | Quantidade de partidas perdidas. |
+| **Empates** | `bigint` | Quantidade de partidas empatadas. |
+| **Saldo** | `bigint` | Saldo final de gols do time no campeonato. |
+| **Qtd_Jogadores** | `bigint` | Quantidade de atletas no elenco. |
+| **Idade_Media** | `string` | Média de idade do elenco. |
+| **Estrangeiros** | `bigint` | Total de jogadores gringos. |
+| **Valor_total** | `double` | Soma do valor de mercado (dinheiro) do elenco. |
+| **Media_Valor** | `double` | Média em dinheiro do valor de cada jogador. |
+| **GolsFeitos** | `int` | Total de gols marcados pelo time. |
+| **GolsSofridos** | `int` | Total de gols sofridos pelo time. |
 
 ---
 
 ## 📈 Análise de Dados e Respostas (Etapa 4.5)
 
-Fiz três perguntas principais para a base na camada Gold:
+Com a base limpa, as perguntas foram respondidas na Camada Gold:
 
 **1. O Dinheiro compra resultado em campo?**
-> A resposta é  **SIM**. O gráfico de dispersão mostrou que os times do G4 (1º ao 4º) ostentam médias de valor de elenco lá em cima, na casa dos 50 a 60 milhões. Já os times na zona de rebaixamento tem elencos mais baratos, na faixa dos 20 milhões. O investimento dita a tendência da tabela.
+> A resposta é **SIM**. O gráfico mostra que os times do G4 (1º ao 4º) ostentam médias de valor de elenco lá em cima, na casa dos 50 a 60 milhões. Já os times na zona de rebaixamento tem elencos mais baratos, na faixa dos 20 milhões. O poder de investimento dita claramente a tendência da tabela.
 
-*<img width="1333" height="358" alt="Captura de tela 2026-09-04 210934" src="https://github.com/user-attachments/assets/429d5272-3678-40c0-8d39-76178ae874d4" />*
-
+![Análise 1](Análise%201.png)
 
 **2. Experiência vs. Juventude: quem entrega mais saldo de gols?**
->  **A juventude levou a melhor**. Times com média de idade entre 22 e 23 anos conseguiram segurar um saldo de gols médio positivo (fazem mais do que sofrem). Conforme a média de idade passa dos 25 anos, o saldo despenca e fica negativo. Campeonato longo exige fôlego!
+> **A juventude levou a melhor**. Times com média de idade entre 22 e 23 anos conseguiram segurar um saldo de gols médio positivo (fazem mais do que sofrem). Conforme a média de idade passa dos 25 anos, o saldo despenca e fica negativo. Campeonato longo exige fôlego físico!
 
-*<img width="1332" height="395" alt="Captura de tela 2026-09-04 211024" src="https://github.com/user-attachments/assets/4538ca16-dfb7-45be-96b3-9d3e6fdba331" />*
+![Análise 2](Análise%202.png)
 
 **3. O Fator Gringo: vale a pena trazer estrangeiros?**
-> **Sim**, os estrangeiros ajudam a puxar as vitórias pra cima. Mas o interessante é que existe um "ponto ideal". A média de vitórias sobe até atingir o pico (16.2 vitórias) nos times que têm exatamente 4 estrangeiros. Passou de 5, a média dá uma leve recuada.
+> **Sim**, existe um "ponto de equilíbrio". A média de vitórias sobe conforme a contratação de estrangeiros aumenta, atingindo o pico (16.2 vitórias) nos times que têm exatamente 4 gringos. Passou de 5 estrangeiros, a média dá uma leve recuada, sugerindo o limite ideal para mesclar com a base nacional.
 
-*<img width="1334" height="407" alt="Captura de tela 2026-09-04 211130" src="https://github.com/user-attachments/assets/6396f99b-998e-4b04-ac68-60370e40af19" />*
+![Análise 3](Análise%203.png)
+
+**4. A Eficiência Financeira (O "Moneyball" Brasileiro)**
+> Para descobrir a real eficiência, calculei o total de pontos (Vitórias x 3 + Empates) e dividi pelo Valor Total do Elenco. O resultado foi fascinante: enquanto gigantes como São Paulo e Flamengo chegam a gastar mais de 1 milhão de reais por cada ponto conquistado, times modestos como Joinville e Prudente conseguiram um ponto custando cerca de 100 a 118 mil reais. O dinheiro compra posições altas, mas o custo da eficiência para os times de ponta é inflacionado e desproporcional.
+
+![Análise 4](Análise%204.png)
 
 ---
 
 ## 🧠 Autoavaliação
 
-Foi um baita desafio sair do zero e ver o pipeline rodando do começo ao fim. Bater cabeça com a limpeza de strings e tipos no PySpark e depois lidar com os bloqueios de segurança do formato Delta (quando o metadata da tabela não bateu após eu renomear uma coluna) foram momentos de muito aprendizado. Ver os gráficos gerando os insights lá no final compensou o esforço. Deu pra entender na prática o valor imenso que uma boa engenharia, catálogo e limpeza de dados tem antes de qualquer trabalho de análise ou BI. Como trabalhos futuros, pretendo plugar uma ferramenta externa como o Power BI consumindo esses dados da camada Gold.
+Foi um baita desafio sair da teoria e ver o pipeline rodando do começo ao fim. Bater cabeça com a limpeza de strings e tipos no PySpark e depois lidar com os mecanismos de segurança do formato Delta (quando o metadata da tabela não bateu após eu renomear uma coluna) geraram um aprendizado técnico profundo. 
+
+Ver os gráficos respondendo às perguntas lá no final compensou o esforço, especialmente ao conseguir gerar insights com viés de Business Intelligence (como calcular o ROI dos elencos na Análise 4). Ficou claríssimo na prática o valor imenso que uma boa engenharia e governança de dados tem antes de qualquer trabalho analítico. Como trabalhos futuros, pretendo plugar uma ferramenta de visualização externa, como o Power BI, consumindo essa tabela da Camada Gold para criar dashboards interativos.
